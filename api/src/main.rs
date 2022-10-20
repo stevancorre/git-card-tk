@@ -5,7 +5,7 @@ mod gen;
 extern crate rocket;
 
 use color::is_valid_color;
-use gen::{options::GenOptions};
+use gen::{options::GenOptions, svg::gen_svg};
 use rocket::{
     get,
     http::{ContentType, Status},
@@ -20,6 +20,8 @@ fn svg(title: String, color: String) -> Result<(ContentType, String), Status> {
     }
 
     let options = GenOptions::new(title, color);
+
+    Ok((ContentType::SVG, gen_svg(&options)))
 }
 
 #[get("/")]
