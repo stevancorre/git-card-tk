@@ -5,31 +5,41 @@ mod gen;
 extern crate rocket;
 
 use color::is_valid_color;
-use gen::{options::GenOptions, svg::gen_svg};
+use gen::{options::GenOptions, png::gen_png};
 use rocket::{
+    fs::{relative, NamedFile},
     get,
-    http::{ContentType, Status},
-    serde::json::Json,
+    http::Status,
 };
+use std::path::Path;
 
-#[get("/svg?<title>&<color>")]
-fn svg(title: String, color: String) -> Result<(ContentType, String), Status> {
+#[derive(Responder)]
+#[response(status = 200, content_type = "image/png")]
+struct IncludedHtml(&'static [u8]);
+
+#[get("/png?<title>&<subtitle>&<color>")]
+async fn png(
+    title: String,
+    subtitle: Option<String>,
+    color: String,
+) -> Result<Option<NamedFile>, Status> {
     if !is_valid_color(&*color) {
         // TODO: return error as image
         return Err(Status::BadRequest);
     }
 
-    let options = GenOptions::new(title, color);
+    let options = GenOptions::new(title, subtitle, color);
+    let file_name = format!("{}.png", options.hash);
 
-    Ok((ContentType::SVG, gen_svg(&options)))
-}
+    let path = Path::new(relative!("gen")).join(file_name);
+    if !path.exists() {
+        gen_png(&options);
+    }
 
-#[get("/")]
-fn root() -> Result<Json<String>, Status> {
-    Ok(Json(String::from("Ok")))
+    Ok(NamedFile::open(path).await.ok())
 }
 
 #[launch]
 fn rocket() -> _ {
-    rocket::build().mount("/", routes![root, svg])
+    rocket::build().mount("/", routes![png])
 }
